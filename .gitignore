@@ -1,0 +1,4 @@
+.env
+__pycache__/
+*.pyc
+k8s/db-secret.yaml
