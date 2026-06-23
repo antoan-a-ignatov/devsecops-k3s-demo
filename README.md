@@ -26,11 +26,11 @@ All three tiers run as separate Deployments and Services on a single-node K3s cl
 
 ## What this project shows
 
-| Job requirement | What's in this repo |
+| Skill/Technology | What's in this repo |
 |---|---|
 | Docker and Docker Compose | 3-tier app, built and tested locally with Compose first |
 | Compose to Kubernetes migration | Converted with Kompose, then reviewed and fixed by hand (details below) |
-| K3s experience | Real deployment, debugging, and one full incident recovery |
+| K3s | Real deployment, debugging, and one full incident recovery |
 | Container hardening | Multi-stage Dockerfiles, non-root users, dropped Linux capabilities, K8s securityContext |
 | Secrets management | A plaintext password introduced by the automated conversion, caught and replaced with a proper Secret |
 | Network security | NetworkPolicy limiting database access to the API pod only, tested with live traffic |
@@ -64,7 +64,7 @@ kubectl get pods
 kubectl get ingress
 ```
 
-Find your K3s node's IP with `kubectl get nodes -o wide` and open it in a browser.
+Find K3s node's IP with `kubectl get nodes -o wide` and open it in a browser.
 
 ## Secrets
 
@@ -72,23 +72,23 @@ Find your K3s node's IP with `kubectl get nodes -o wide` and open it in a browse
 
 ## Security hardening
 
-- **Non-root containers.** API and database run as their real non-root UIDs (checked by hand, not guessed), enforced with `runAsNonRoot`.
-- **Dropped capabilities.** Every container drops all Linux capabilities by default, then adds back only what it actually needs. Nginx needed `NET_BIND_SERVICE`, `CHOWN`, `SETUID`, and `SETGID` for its normal startup sequence (it binds port 80 as root, then drops to an unprivileged user). Dropping everything with no exceptions broke it on the first try, which was a good reminder that these controls need to be applied with some thought, not copy-pasted blindly.
+- **Non-root containers.** API and database run as their real non-root UIDs (checked by hand), enforced with `runAsNonRoot`.
+- **Dropped capabilities.** Every container drops all Linux capabilities by default, then adds back only what it actually needs. Nginx needs `NET_BIND_SERVICE`, `CHOWN`, `SETUID`, and `SETGID` for its normal startup sequence (it binds port 80 as root, then drops to an unprivileged user). Dropping everything with no exceptions broke it on the first try, which was a good reminder that these controls need to be applied per container.
 - **Resource limits.** Every container has CPU and memory requests and limits.
 - **Health probes.** Liveness and readiness checks on all three tiers, HTTP for frontend and API, a `pg_isready` exec probe for Postgres.
-- **Network policy.** Only the API pod can reach the database on port 5432. Worth noting: K3s's default Flannel CNI doesn't enforce NetworkPolicy on its own, but K3s ships a separate kube-router-based controller that does, so this works out of the box without installing anything extra.
+- **Network policy.** Only the API pod can reach the database on port 5432. Worth noting: K3s's default Flannel CNI doesn't enforce NetworkPolicy on its own, but K3s ships a separate kube-router-based controller that does, so this works out of the box without installing anything.
 
 ## Migrating from Compose to K3s
 
-Kompose got most of the way there automatically, but it needed real review and fixes, not just a blind `kubectl apply`:
+Kompose got most of the way there automatically, but it needed review and fixes, not just a blind `kubectl apply`:
 
-1. **Plaintext password.** Kompose resolved the `.env` variable from the Compose file at conversion time and wrote the actual password straight into the generated Deployment YAML. Caught this before it ever touched git history and replaced it with a Secret.
+1. **Plaintext password.** Kompose resolved the `.env` variable from the Compose file at conversion time and wrote the actual password straight into the generated Deployment YAML. Caught this immediately and replaced it with a Secret.
 2. **Missing Services.** Kompose only creates a Service for containers that had a `ports:` block in the original Compose file. The API and database never needed one in Compose (they just used Docker's internal DNS), so Kompose skipped them. Added both manually.
-3. **No registry yet.** Kompose assumes your images come from a registry. For now, images are built locally and imported straight into K3s with `imagePullPolicy: Never`. That changes once the CI/CD pipeline (Day 3) starts pushing to GHCR.
+3. **No registry yet.** Kompose assumes your images come from a registry. For now, images are built locally and imported straight into K3s with `imagePullPolicy: Never`. That changes once the CI/CD pipeline starts pushing to GHCR.
 
 ## One incident worth mentioning
 
-Partway through, the K3s cluster started crash-looping after a WSL2 restart, failing an internal RBAC bootstrap step with a deliberately vague error message. Ruled out disk space and a corrupted datastore, then traced it to an outdated WSL2 kernel. Fixed with `wsl --update`, a clean K3s reinstall, and a kubeconfig refresh. Leaving this in the README because troubleshooting a real failure is at least as relevant to this role as anything that went smoothly.
+Partway through, the K3s cluster started crash-looping after a WSL2 restart, failing an internal RBAC bootstrap step with a deliberately vague error message. Ruled out disk space and a corrupted datastore, then traced it to an outdated WSL2 kernel. Fixed with `wsl --update`, a clean K3s reinstall, and a kubeconfig refresh.
 
 ## Roadmap
 
@@ -101,6 +101,7 @@ Partway through, the K3s cluster started crash-looping after a WSL2 restart, fai
 - Staging and production namespaces with a real promotion flow
 - A deployment to AKS to prove the cloud migration path
 
-## Stack
+## Stack (so far)
 
 Docker, Docker Compose, Kompose, Kubernetes, K3s, Traefik, PostgreSQL, Flask, Nginx
+
