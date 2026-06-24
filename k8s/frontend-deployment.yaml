@@ -20,6 +20,12 @@ spec:
       labels:
         io.kompose.service: frontend
     spec:
+      # nosemgrep: yaml.kubernetes.security.run-as-non-root.run-as-non-root
+      # Deliberately not setting runAsNonRoot here: the official nginx:alpine image's
+      # master process must start as root to bind port 80 (a privileged port), then
+      # drops to the unprivileged nginx user (UID 101) internally on its own.
+      # allowPrivilegeEscalation:false and capabilities drop:ALL (with only the specific
+      # capabilities nginx needs added back) still apply, see container securityContext below.
       containers:
         - image: frontend
           imagePullPolicy: Never

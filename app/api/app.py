@@ -27,4 +27,8 @@ def data():
     return jsonify({"db_time": str(result[0])}), 200
 
 if __name__ == "__main__":
+    # nosemgrep: python.flask.security.audit.app-run-param-config.avoid_app_run_with_bad_host
+    # Binding to 0.0.0.0 is required here: this runs inside an isolated Kubernetes pod
+    # network namespace, not a shared host. The Service/Ingress can only reach the
+    # container if Flask listens on all interfaces inside its own pod.
     app.run(host="0.0.0.0", port=5000)
