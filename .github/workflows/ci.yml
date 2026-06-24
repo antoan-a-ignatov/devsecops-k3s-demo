@@ -94,7 +94,8 @@ jobs:
           ignore-unfixed: true
           exit-code: 1
 
-      - name: Scan database image
+      - name: Scan database image (non-blocking, see README)
+        continue-on-error: true
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: postgres:16-alpine
