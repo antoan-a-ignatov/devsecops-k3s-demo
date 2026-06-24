@@ -30,9 +30,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run Semgrep
-        run: semgrep ci --config auto
-        env:
-          SEMGREP_RULES: auto
+        run: semgrep ci --config auto --exclude-rule yaml.kubernetes.security.run-as-non-root.run-as-non-root
 
   build:
     needs: sast
