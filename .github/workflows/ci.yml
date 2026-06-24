@@ -20,8 +20,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build:
+  sast:
     needs: detect-secrets
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run Semgrep
+        run: semgrep ci --config auto
+        env:
+          SEMGREP_RULES: auto
+
+  build:
+    needs: sast
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
