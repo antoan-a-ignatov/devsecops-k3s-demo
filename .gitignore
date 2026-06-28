@@ -2,3 +2,7 @@
 __pycache__/
 *.pyc
 k8s/db-secret.yaml
+terraform/terraform.tfvars
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform/
