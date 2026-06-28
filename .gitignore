@@ -7,3 +7,4 @@ terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform/.terraform/
 terraform/github_cidrs.auto.tfvars.json
+terraform/k3s_api_cidrs.auto.tfvars.json
