@@ -130,7 +130,8 @@ jobs:
 
       - name: Write CIDR tfvars file
         working-directory: ./terraform
-        run: echo "{\"github_actions_cidrs\": ${{ steps.gh-ips.outputs.cidrs }}}" > github_cidrs.auto.tfvars.json
+        run: |
+          echo "{\"github_actions_cidrs\": ${{ steps.gh-ips.outputs.cidrs }}}" > github_cidrs.auto.tfvars.json
       - name: Terraform apply
         working-directory: ./terraform
         run: |
