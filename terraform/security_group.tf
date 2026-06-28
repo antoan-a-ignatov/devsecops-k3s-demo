@@ -10,6 +10,14 @@ resource "aws_security_group" "k3s_demo" {
     cidr_blocks = [var.my_ip]
   }
 
+  ingress {
+    description = "K3s API access for GitHub Actions CD pipeline"
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = var.github_actions_cidrs
+  }
+
   egress {
     description = "Allow all outbound traffic"
     from_port   = 0

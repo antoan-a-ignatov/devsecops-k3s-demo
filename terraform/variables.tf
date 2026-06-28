@@ -3,3 +3,9 @@ variable "my_ip" {
   type        = string
   default     = "127.0.0.1/32"
 }
+
+variable "github_actions_cidrs" {
+  description = "GitHub Actions runner IP ranges, for K3s API access from CD pipeline"
+  type        = list(string)
+  default     = ["127.0.0.1/32"]
+}
