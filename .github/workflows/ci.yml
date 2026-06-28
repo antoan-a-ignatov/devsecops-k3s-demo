@@ -100,7 +100,7 @@ jobs:
       - name: Write CIDR tfvars file
         working-directory: ./terraform
         run: |
-          JQ_FILTER='{github_actions_cidrs: .actions}'
+          JQ_FILTER='{github_actions_cidrs: [.actions[] | select(test(":") | not)]}'
           curl -s https://api.github.com/meta | jq "$JQ_FILTER" > github_cidrs.auto.tfvars.json
 
       - name: Configure AWS credentials
