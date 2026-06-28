@@ -128,12 +128,14 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Write CIDR tfvars file
+        working-directory: ./terraform
+        run: echo "{\"github_actions_cidrs\": ${{ steps.gh-ips.outputs.cidrs }}}" > github_cidrs.auto.tfvars.json
       - name: Terraform apply
         working-directory: ./terraform
         run: |
           terraform init
-          terraform apply -auto-approve -var='github_actions_cidrs=${{ steps.gh-ips.outputs.cidrs }}'
-
+          terraform apply -auto-approve
       - name: Wait for instance boot
         run: sleep 180
 

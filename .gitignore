@@ -6,3 +6,4 @@ terraform/terraform.tfvars
 terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform/.terraform/
+terraform/github_cidrs.auto.tfvars.json
