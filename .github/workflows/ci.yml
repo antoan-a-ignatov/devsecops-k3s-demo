@@ -4,6 +4,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME_API: ${{ github.repository }}/api
@@ -128,6 +129,10 @@ jobs:
             echo "Waiting for K3s API to become ready... ($i/20)"
             sleep 15
           done
+
+      - name: Debug security group state
+        run: |
+          aws ec2 describe-security-groups --filters "Name=group-name,Values=k3s-demo-sg" --query "SecurityGroups[0].IpPermissions" --output json
 
       - name: Deploy to K3s
         run: |
