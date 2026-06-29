@@ -124,7 +124,7 @@ jobs:
         run: |
           for i in $(seq 1 20); do
             aws ssm get-parameter --name "/k3s-demo/kubeconfig" --region eu-north-1 --with-decryption --query "Parameter.Value" --output text > /tmp/kubeconfig
-            kubectl --kubeconfig=/tmp/kubeconfig get nodes && break
+            kubectl --kubeconfig=/tmp/kubeconfig --request-timeout=10s get nodes && break
             echo "Waiting for K3s API to become ready... ($i/20)"
             sleep 15
           done
