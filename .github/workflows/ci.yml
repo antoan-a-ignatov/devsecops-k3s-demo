@@ -114,8 +114,20 @@ jobs:
           terraform init
           terraform apply -auto-approve
 
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
       - name: Wait for instance boot
-        run: sleep 180
+        run: |
+          for i in $(seq 1 20); do
+            aws ssm get-parameter --name "/k3s-demo/kubeconfig" --region eu-north-1 --with-decryption --query "Parameter.Value" --output text > /tmp/kubeconfig
+            kubectl --kubeconfig=/tmp/kubeconfig get nodes && break
+            echo "Waiting for K3s API to become ready... ($i/20)"
+            sleep 15
+          done
 
       - name: Deploy to K3s
         run: |
