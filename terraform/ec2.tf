@@ -36,7 +36,7 @@ resource "aws_instance" "k3s_demo" {
     PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
 
     echo "PUBLIC_IP resolved to: $PUBLIC_IP"
-    curl -sfL https://get.k3s.io | sh -s - --tls-san "$PUBLIC_IP" --disable metrics-server --disable servicelb --kube-apiserver-arg=max-requests-inflight=50 --kube-controller-manager-arg=node-monitor-period=60s --kube-controller-manager-arg=node-monitor-grace-period=180s
+    curl -sfL https://get.k3s.io | sh -s - --tls-san "$PUBLIC_IP" --disable metrics-server --kube-apiserver-arg=max-requests-inflight=50 --kube-controller-manager-arg=node-monitor-period=60s --kube-controller-manager-arg=node-monitor-grace-period=180s
 
     sleep 30
 
