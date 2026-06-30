@@ -25,8 +25,8 @@ spec:
       # drops to the unprivileged nginx user (UID 101) internally on its own.
       # nosemgrep: yaml.kubernetes.security.run-as-non-root.run-as-non-root
       containers:
-        - image: frontend
-          imagePullPolicy: Never
+        - image: ghcr.io/antoan-a-ignatov/devsecops-k3s-demo/frontend:latest
+          imagePullPolicy: Always
           name: frontend
           ports:
             - containerPort: 80

@@ -33,8 +33,8 @@ spec:
                   key: DB_PASSWORD
             - name: DB_USER
               value: appuser
-          image: api
-          imagePullPolicy: Never
+          image: ghcr.io/antoan-a-ignatov/devsecops-k3s-demo/api:latest
+          imagePullPolicy: Always
           name: api
           resources:
             requests:
