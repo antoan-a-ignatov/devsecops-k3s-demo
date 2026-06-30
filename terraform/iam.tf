@@ -39,3 +39,8 @@ resource "aws_iam_instance_profile" "k3s_instance_profile" {
   name = "k3s-demo-instance-profile"
   role = aws_iam_role.k3s_instance_role.name
 }
+
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.k3s_instance_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}

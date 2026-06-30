@@ -22,6 +22,17 @@ spec:
       labels:
         io.kompose.service: db
     spec:
+      securityContext:
+        fsGroup: 70
+      initContainers:
+        - name: fix-permissions
+          image: busybox
+          command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: pgdata
+          securityContext:
+            runAsUser: 0
       containers:
         - env:
             - name: POSTGRES_DB
@@ -64,6 +75,9 @@ spec:
             capabilities:
               drop:
                 - ALL
+              add:
+                - CHOWN
+                - FOWNER
           volumeMounts:
             - mountPath: /docker-entrypoint-initdb.d/init.sql
               name: db-cm0
