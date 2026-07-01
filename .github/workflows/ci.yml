@@ -123,8 +123,15 @@ jobs:
 
       - name: Wait for instance boot
         run: |
+          INSTANCE_IP=$(cd terraform && terraform output -raw instance_public_ip)
           for i in $(seq 1 10); do
             aws ssm get-parameter --name "/k3s-demo/kubeconfig" --region eu-north-1 --with-decryption --query "Parameter.Value" --output text > /tmp/kubeconfig
+            KUBECONFIG_IP=$(grep server /tmp/kubeconfig | grep -oP '(?<=https://)[^:]+')
+            if [ "$KUBECONFIG_IP" != "$INSTANCE_IP" ]; then
+              echo "Kubeconfig still has old IP ($KUBECONFIG_IP), waiting for new instance ($INSTANCE_IP)... ($i/10)"
+              sleep 15
+              continue
+            fi
             kubectl --kubeconfig=/tmp/kubeconfig --request-timeout=10s get nodes && break
             echo "Waiting for K3s API to become ready... ($i/10)"
             sleep 15
