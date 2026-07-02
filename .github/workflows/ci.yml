@@ -141,6 +141,13 @@ jobs:
         run: |
           aws ec2 describe-security-groups --filters "Name=group-name,Values=k3s-demo-sg" --query "SecurityGroups[0].IpPermissions" --output json
 
+      - name: Create database credentials secret
+        run: |
+          KUBECONFIG=/tmp/kubeconfig kubectl create secret generic db-credentials \
+            --from-literal=DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
+            --dry-run=client -o yaml | \
+          KUBECONFIG=/tmp/kubeconfig kubectl apply -f -
+
       - name: Deploy to K3s
         run: |
           aws ssm get-parameter --name "/k3s-demo/kubeconfig" --region eu-north-1 --with-decryption --query "Parameter.Value" --output text > /tmp/kubeconfig

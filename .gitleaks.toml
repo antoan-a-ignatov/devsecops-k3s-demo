@@ -1,8 +1,0 @@
-title = "Gitleaks config for devsecops-k3s-demo"
-
-[extend]
-useDefault = true
-
-[allowlist]
-description = "SealedSecret encryptedData fields are asymmetrically encrypted ciphertext, decryptable only by the in-cluster Sealed Secrets controller's private key. They are designed to be safe to commit publicly, that is the entire purpose of the tool. Gitleaks' generic-api-key rule flags the encrypted blob as credential-shaped, a false positive given the encryption context. See README Security Findings section."
-paths = ['''k8s/db-sealed-secret\.yaml''']

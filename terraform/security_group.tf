@@ -15,6 +15,13 @@ resource "aws_security_group" "k3s_demo" {
     protocol    = "tcp"
     cidr_blocks = var.k3s_api_cidrs
   }
+  ingress {
+    description = "HTTP access to the application frontend via Traefik Ingress, open to everyone by design"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
   egress {
     description = "Allow all outbound traffic"
     from_port   = 0
