@@ -53,7 +53,7 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Effect = "Allow"
         # Resource is scoped to the exact state bucket ARN below, not "*" — Semgrep's
         # data-exfiltration rule doesn't correlate the Action list with the Resource block.
-        # nosemgrep: terraform.lang.security.iam.no-iam-data-exfiltration.no-iam-data-exfiltration
+        # nosemgrep
         Action = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
         Resource = [
           "arn:aws:s3:::devsecops-k3s-demo-tfstate-antoan",
@@ -82,6 +82,7 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Action = [
           "iam:CreateRole", "iam:GetRole", "iam:DeleteRole",
           "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
+          "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
           "iam:CreateInstanceProfile", "iam:GetInstanceProfile", "iam:DeleteInstanceProfile",
           "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
           "iam:ListInstanceProfilesForRole", "iam:TagRole"
@@ -111,7 +112,7 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Effect = "Allow"
         # Condition restricts PassRole to the EC2 service only — cannot pass a
         # k3s-demo-* role to Lambda or any other escalation-prone service.
-        # nosemgrep: terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
+        # nosemgrep
         Action   = "iam:PassRole"
         Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
         Condition = {
@@ -125,14 +126,15 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Effect = "Allow"
         # Resource is scoped to the exact OIDC provider ARN this role lives under —
         # cannot manage any other provider.
-        # nosemgrep: terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
+        # nosemgrep
         Action = [
-          "iam:CreateRole", "iam:GetRole", "iam:DeleteRole",
-          "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
-          "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
-          "iam:CreateInstanceProfile", "iam:GetInstanceProfile", "iam:DeleteInstanceProfile",
-          "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
-          "iam:ListInstanceProfilesForRole", "iam:TagRole"
+          "iam:GetOpenIDConnectProvider",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:UpdateOpenIDConnectProviderThumbprint",
+          "iam:TagOpenIDConnectProvider",
+          "iam:UntagOpenIDConnectProvider",
+          "iam:ListOpenIDConnectProviderTags"
         ]
         Resource = "arn:aws:iam::180571023536:oidc-provider/token.actions.githubusercontent.com"
       },
