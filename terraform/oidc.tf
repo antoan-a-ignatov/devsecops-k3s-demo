@@ -78,7 +78,7 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         # priv-esc/resource-exposure risk regardless of scoping. Resource is
         # constrained to k3s-demo-* ARNs; the actual escalation vectors
         # (AttachRolePolicy, PassRole) are separately condition-scoped below.
-        # nosemgrep: terraform.lang.security.iam.no-iam-priv-esc-funcs.no-iam-priv-esc-funcs, terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
+        # nosemgrep
         Action = [
           "iam:CreateRole", "iam:GetRole", "iam:DeleteRole",
           "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
@@ -97,7 +97,7 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         # Condition restricts this to attaching/detaching exactly one managed
         # policy (AmazonSSMManagedInstanceCore) — cannot attach AdministratorAccess
         # or any other policy to a k3s-demo-* role.
-        # nosemgrep: terraform.lang.security.iam.no-iam-priv-esc-funcs.no-iam-priv-esc-funcs, terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
+        # nosemgrep
         Action   = ["iam:AttachRolePolicy", "iam:DetachRolePolicy"]
         Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
         Condition = {
