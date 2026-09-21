@@ -3,7 +3,7 @@
 ## Project Status
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/antoan-a-ignatov/devsecops-k3s-demo/ci.yml?style=flat-square&label=Build)](https://github.com/antoan-a-ignatov/devsecops-k3s-demo/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/antoan-a-ignatov/devsecops-k3s-demo?style=flat-square)](https://github.com/antoan-a-ignatov/devsecops-k3s-demo/releases) [![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/) [![K3s](https://img.shields.io/badge/K3s-FF6C37?style=flat-square&logo=kubernetes&logoColor=white)](https://k3s.io/) [![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=flat-square&logo=terraform&logoColor=white)](https://developer.hashicorp.com/terraform) [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)](https://docs.github.com/actions) [![AWS](https://img.shields.io/badge/AWS-232F3E?style=flat-square&logo=amazonaws&logoColor=white)](https://aws.amazon.com/)
-* **Current Version:** v1.0.0
+* **Current Version:** v1.1.0
 * **Status:** Functional cloud deployment complete
 
 <img src="docs/images/frontend.png" width="347">
@@ -13,7 +13,7 @@
 
 ## Introduction
 This project demonstrates the migration of an application from Docker Compose to Kubernetes (K3s) while applying modern DevSecOps practices including infrastructure as code, automated security scanning, supply-chain hardening, and cloud-native deployment. It was built as a portfolio project to showcase practical engineering decisions, troubleshooting, and security trade-offs.
-The architecture consists of a three-tier application migrated from Docker Compose to K3s, with a fully automated CI/CD pipeline implementing real DevSecOps controls - secrets detection, static application security testing (SAST), container image scanning, supply-chain pinning, and cloud deployment via Terraform-provisioned infrastructure.
+The architecture consists of a three-tier application migrated from Docker Compose to K3s, with a fully automated CI/CD pipeline implementing real DevSecOps controls: secrets detection, SAST, container image scanning, supply-chain pinning, OIDC-federated cloud authentication, and deployment via Terraform-provisioned infrastructure.
 
 ## Table of Contents
 1. [Skills Demonstrated](#skills-demonstrated)
@@ -37,7 +37,7 @@ The architecture consists of a three-tier application migrated from Docker Compo
 | Cloud deployment | EC2 instance provisioned per pipeline run via Terraform, destroyed after demo completion |
 | CI/CD pipeline | GitHub Actions orchestrating a sequential flow from secrets scanning and SAST to build, image scanning, and deployment |
 | Container hardening | Multi-stage Dockerfiles, non-root users, dropped Linux capabilities, and Kubernetes securityContext configurations |
-| Secrets management | Pipeline-injected Kubernetes Secrets from GitHub Secrets, never committed to version control |
+| Secrets management | Pipeline-injected Kubernetes Secrets from GitHub Secrets, never committed to git; CI-to-AWS authentication via GitHub OIDC federation, no long-lived AWS credentials stored anywhere |
 | Network security | NetworkPolicy restricting database access to the API pod only, enforced by the K3s embedded kube-router controller |
 | Supply-chain security | All GitHub Actions pinned to immutable 40-character commit SHAs |
 | Deployment automation | Liveness and readiness probes along with resource requests and limits applied to every container |
@@ -122,7 +122,7 @@ While Kompose handles the mechanical conversion process, the generated output re
 * **CI/CD and Automation:** GitHub Actions, Helm
 * **Security Scanning:** Gitleaks, Semgrep, Trivy
 * **Infrastructure as Code:** Terraform
-* **Cloud Platform:** AWS (EC2, S3, Systems Manager Parameter Store)
+* **Cloud Platform:** AWS (EC2, S3, IAM OIDC Federation, Systems Manager Parameter Store)
 * **Container Registry:** GitHub Container Registry (GHCR)
 
 ### Technologies Evaluated
@@ -147,6 +147,8 @@ The pipeline triggers on every push to main and every pull request. Stages execu
 
 The deployment job provisions a fresh EC2 instance or reuses an existing one via Terraform, waits for K3s to finish booting, and verifies that the kubeconfig IP matches the new instance before attempting a connection. It then creates the database Secret from a GitHub Secret and applies the Kubernetes manifests. 
 
+Authentication to AWS uses GitHub's OIDC provider rather than static credentials: the `deploy` job requests a short-lived identity token (`permissions: id-token: write`), which GitHub exchanges with AWS STS for temporary credentials scoped to a single IAM role. No AWS access key ever exists in this repository.
+
 The K3s API port (6443) is opened to all traffic exclusively for the duration of this step. It is immediately closed by a final cleanup step running with an absolute execution rule, ensuring security enforcement even if the deployment fails. Images are tagged with both the latest tag and the exact commit SHA, linking every deployed artifact directly to an auditable point in git history.
 
 ![Application](docs/images/github-action.png)
@@ -163,9 +165,16 @@ The K3s API port (6443) is opened to all traffic exclusively for the duration of
 * **Postgres Volume Access:** K3s uses local-path-provisioner, backing volumes with plain hostPath directories on the node. Because the fsGroup setting does not apply to hostPath volumes, a root-owned directory causes Postgres initialization to fail. An init container running as root modifies the directory ownership via chown before the main Postgres container starts, allowing Postgres to run securely as a non-root user.
 * **Supply-Chain Hardening:** All actions within the GitHub Actions workflow are pinned to immutable 40-character commit SHAs instead of mutable tags, preventing untrusted upstream modifications from compromising the pipeline. Human-readable tags are preserved alongside the SHAs as comments.
 * **Resource Constraints:** Every container is configured with explicit CPU and memory requests and limits to ensure stability and prevent resource exhaustion on the cluster.
+* **CI identity least privilege.** The GitHub Actions OIDC role's IAM policy is scoped as tightly as AWS's API allows. S3 state access, SSM parameter access, and IAM role/instance-profile management are all constrained to exact resource ARNs. `iam:AttachRolePolicy`/`DetachRolePolicy` is further restricted with a `Condition` to the single managed policy this project actually uses (`AmazonSSMManagedInstanceCore`), and `iam:PassRole` is restricted to the EC2 service only — both close specific, nameable privilege-escalation paths (attaching a broader policy to a role it created, or passing that role to an unintended service). EC2 instance and security-group mutation actions (`RunInstances`, `CreateSecurityGroup`, etc.) remain unscoped by resource, the same documented tradeoff as the K3s API exposure above: AWS does not support tag-based conditions on these actions before the resource exists, so per-resource scoping isn't available at all, not just impractical.
+
+One gap is deliberately left open rather than papered over: `iam:PutRolePolicy` lets this role attach an arbitrary inline policy to any role it creates, which a `Condition` key can't constrain the way managed-policy attachment can. Closing this fully requires an IAM Permissions Boundary — a policy that caps what any role this identity creates can ever do, regardless of what's attached to it later. That's tracked as a planned addition rather than implemented now; the residual risk is narrower than what's already closed, and a rushed boundary policy is a well-known source of its own bypass bugs if not designed and verified carefully.
 
 ### Secrets Management
 The database password is kept securely as a GitHub Secret and injected directly as a Kubernetes Secret by the pipeline during deployment. It is never written to disk within the repository or exposed in git history. This model introduces a trade-off: the secret must be regenerated during every infrastructure recreation cycle, which is an accepted characteristic of utilizing ephemeral infrastructure patterns.
+
+CI-to-AWS authentication originally used a long-lived IAM user's access keys, stored as GitHub Secrets. That user (`antoanignatov`) was created manually in the AWS console before any Terraform infrastructure existed, has `AdministratorAccess` attached via an IAM group, and was never tracked in this repo's Terraform state — entirely out-of-band from the rest of the project's IaC-managed identities.
+
+This was replaced with GitHub OIDC federation: an IAM OIDC identity provider and a purpose-built IAM role (`k3s-demo-github-actions-deploy`), both defined in `terraform/oidc.tf` and version-controlled like every other resource in this project. The role's trust policy is scoped to this exact repository and the `main` branch via the GitHub OIDC token's `sub` claim, so a pull-request-triggered run cannot assume it. The role ARN itself is stored as a GitHub repository *Variable*, not a *Secret* — it identifies which role to assume, not a credential that grants access on its own.
 
 ### Pipeline Findings
 Running active security scanners against the application code, Kubernetes manifests, GitHub Actions workflows, and container images surfaced genuine findings rather than producing a clean report by default. These findings were investigated, documented, and either remediated or consciously accepted based on their impact and the project's goals.
@@ -174,6 +183,8 @@ Running active security scanners against the application code, Kubernetes manife
 * `python.flask.security.audit.app-run-param-config.avoid_app_run_with_bad_host`: Flagged the use of `app.run(host="0.0.0.0")` in the Flask API. This was assessed as a false positive in this specific environment, as the container operates in an isolated pod network namespace and binding to all interfaces is required for the Kubernetes Service to route traffic to it. This finding is suppressed inline with a `nosemgrep` comment and a documented explanation.
 * `yaml.kubernetes.security.run-as-non-root.run-as-non-root`: Flagged `frontend-deployment.yaml` for missing a pod-level non-root setting. This is intentional, as the Nginx master process requires root access to bind port 80. This rule is excluded at the pipeline level using `--exclude-rule`, with the rationale documented here due to YAML syntax layout constraints.
 * `github-actions-mutable-action-tag`: Flagged actions using mutable version tags. This was resolved by pinning all actions to their definitive commit SHAs.
+* `terraform.lang.security.iam.no-iam-data-exfiltration`: Flagged the S3 state-access actions (`GetObject`, `PutObject`, `ListBucket`) in the OIDC role's policy. False positive: the rule checks for the presence of these actions without correlating them against the `Resource` block, which is scoped to the exact state bucket ARN, not `"*"`. Suppressed inline with `nosemgrep`.
+* `terraform.lang.security.iam.no-iam-priv-esc-funcs` and `terraform.lang.security.iam.no-iam-resource-exposure`: Flagged every IAM role/policy management action in the OIDC role's policy (`CreateRole`, `PutRolePolicy`, `AttachRolePolicy`, `PassRole`, and related actions needed to manage the role's own OIDC provider and inline policies). These rules fire on the presence of these action strings categorically; they don't evaluate whether a `Condition` block mitigates the risk. Genuinely mitigated where AWS's IAM condition keys allow it (see Security hardening, above); suppressed inline where the rule's pattern-matching can't see that mitigation. One suppression syntax detail worth noting: Semgrep's documented comma-delimited multi-rule-ID format (`nosemgrep: rule-1, rule-2`) proved unreliable in practice, inconsistently dropping one of the two rule IDs across repeated identical attempts; switched to a bare `nosemgrep` (no rule ID) on these lines instead, backed by an explanatory comment directly above each one.
 
 #### Trivy (Container Image Scanning)
 * **API Image (`python:3.12-slim`):** Identified 11 findings in base Debian OS packages (perl, ncurses, sqlite) that the application does not consume. These carried an affected or deferred status with no upstream patches available. They were handled using `ignore-unfixed: true`, ensuring the pipeline blocks only on actionable vulnerabilities. Alpine was rejected as an alternative because `psycopg2-binary` uses glibc-only wheels, which would make Alpine builds slow and fragile.
@@ -197,10 +208,16 @@ The Sealed Secrets controller was implemented and tested, but subsequently remov
 ### hostPath Volumes and Directory Ownership
 The Kubernetes `fsGroup` setting does not apply to hostPath-backed volumes, which K3s uses by default via its `local-path-provisioner`. As a result, the Postgres initialization process failed with permission errors when running as a non-root user against a root-owned directory. This was resolved by introducing a root-configured init container that runs a chown command on the shared volume directory before handing off control to the unprivileged main Postgres container.
 
+### Self-referential IAM permissions
+Migrating CI/CD to OIDC federation surfaced a category of gap that's easy to miss: an IAM role needs explicit permission to read and manage *itself* and its own dependencies during a full `terraform apply` refresh — `iam:GetOpenIDConnectProvider` on its own OIDC provider, `iam:ListRolePolicies` and `iam:ListAttachedRolePolicies` on its own role. These aren't implied by having created the resource; each had to be discovered one `AccessDenied` error at a time as Terraform's refresh cycle touched them.
+
+### Semgrep IAM rule suppression syntax
+While tightening the new OIDC role's policy, a documented Semgrep feature (comma-delimited `nosemgrep` rule-ID lists) behaved inconsistently across multiple identical-looking attempts, silently dropping one of two suppressed rules each time. Traced by testing incrementally rather than assuming the documentation matched runtime behavior; resolved by switching to a bare `nosemgrep` annotation backed by an explanatory comment, which doesn't depend on rule-ID list parsing at all.
+
 ## Planned Improvements
 * Implement image signing using Cosign.
 * Generate Software Bill of Materials (SBOM) tracking using `trivy sbom`.
 * Package application manifests into a unified Helm chart.
-* Establish OIDC federation for AWS authentication to eliminate long-lived access keys in GitHub Secrets.
+* IAM Permissions Boundary for the CI OIDC role, closing the residual `iam:PutRolePolicy` privilege-escalation path (see Security hardening)
 * Enforce admission policies using Open Policy Agent (OPA) or Kyverno.
 * Design a structured promotion flow spanning distinct staging and production namespaces.
