@@ -127,13 +127,12 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         # cannot manage any other provider.
         # nosemgrep: terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
         Action = [
-          "iam:GetOpenIDConnectProvider",
-          "iam:CreateOpenIDConnectProvider",
-          "iam:DeleteOpenIDConnectProvider",
-          "iam:UpdateOpenIDConnectProviderThumbprint",
-          "iam:TagOpenIDConnectProvider",
-          "iam:UntagOpenIDConnectProvider",
-          "iam:ListOpenIDConnectProviderTags"
+          "iam:CreateRole", "iam:GetRole", "iam:DeleteRole",
+          "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
+          "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
+          "iam:CreateInstanceProfile", "iam:GetInstanceProfile", "iam:DeleteInstanceProfile",
+          "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
+          "iam:ListInstanceProfilesForRole", "iam:TagRole"
         ]
         Resource = "arn:aws:iam::180571023536:oidc-provider/token.actions.githubusercontent.com"
       },
