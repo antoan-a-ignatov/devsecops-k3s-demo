@@ -123,6 +123,9 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
       {
         Sid    = "IAMManageOwnOIDCProvider"
         Effect = "Allow"
+        # Resource is scoped to the exact OIDC provider ARN this role lives under —
+        # cannot manage any other provider.
+        # nosemgrep: terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
         Action = [
           "iam:GetOpenIDConnectProvider",
           "iam:CreateOpenIDConnectProvider",
