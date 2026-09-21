@@ -67,7 +67,8 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "ec2:RunInstances", "ec2:TerminateInstances", "ec2:CreateTags",
           "ec2:Describe*",
           "ec2:CreateSecurityGroup", "ec2:DeleteSecurityGroup",
-          "ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress"
+          "ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress", "ec2:RevokeSecurityGroupEgress"
         ]
         Resource = "*"
       },
