@@ -51,6 +51,9 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
       {
         Sid    = "TerraformState"
         Effect = "Allow"
+        # nosemgrep: terraform.lang.security.iam.no-iam-data-exfiltration.no-iam-data-exfiltration
+        # Resource is scoped to the exact state bucket ARN below, not "*" — Semgrep
+        # doesn't correlate the Action list with the Resource block on this rule.
         Action = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
         Resource = [
           "arn:aws:s3:::devsecops-k3s-demo-tfstate-antoan",
@@ -76,13 +79,34 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
           "iam:CreateInstanceProfile", "iam:GetInstanceProfile", "iam:DeleteInstanceProfile",
           "iam:AddRoleToInstanceProfile", "iam:RemoveRoleFromInstanceProfile",
-          "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListInstanceProfilesForRole",
-          "iam:TagRole", "iam:PassRole"
+          "iam:ListInstanceProfilesForRole", "iam:TagRole"
         ]
         Resource = [
           "arn:aws:iam::180571023536:role/k3s-demo-*",
           "arn:aws:iam::180571023536:instance-profile/k3s-demo-*"
         ]
+      },
+      {
+        Sid    = "IAMAttachOnlySSMPolicy"
+        Effect = "Allow"
+        Action = ["iam:AttachRolePolicy", "iam:DetachRolePolicy"]
+        Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
+        Condition = {
+          StringEquals = {
+            "iam:PolicyARN" = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+          }
+        }
+      },
+      {
+        Sid    = "IAMPassRoleToEC2Only"
+        Effect = "Allow"
+        Action = "iam:PassRole"
+        Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ec2.amazonaws.com"
+          }
+        }
       },
       {
         Sid      = "SSMKubeconfig"
