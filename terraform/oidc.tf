@@ -121,6 +121,20 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         }
       },
       {
+        Sid    = "IAMManageOwnOIDCProvider"
+        Effect = "Allow"
+        Action = [
+          "iam:GetOpenIDConnectProvider",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:UpdateOpenIDConnectProviderThumbprint",
+          "iam:TagOpenIDConnectProvider",
+          "iam:UntagOpenIDConnectProvider",
+          "iam:ListOpenIDConnectProviderTags"
+        ]
+        Resource = "arn:aws:iam::180571023536:oidc-provider/token.actions.githubusercontent.com"
+      },
+      {
         Sid      = "SSMKubeconfig"
         Effect   = "Allow"
         Action   = "ssm:GetParameter"
