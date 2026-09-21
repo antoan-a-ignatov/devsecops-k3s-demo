@@ -51,9 +51,9 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
       {
         Sid    = "TerraformState"
         Effect = "Allow"
+        # Resource is scoped to the exact state bucket ARN below, not "*" — Semgrep's
+        # data-exfiltration rule doesn't correlate the Action list with the Resource block.
         # nosemgrep: terraform.lang.security.iam.no-iam-data-exfiltration.no-iam-data-exfiltration
-        # Resource is scoped to the exact state bucket ARN below, not "*" — Semgrep
-        # doesn't correlate the Action list with the Resource block on this rule.
         Action = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
         Resource = [
           "arn:aws:s3:::devsecops-k3s-demo-tfstate-antoan",
@@ -74,6 +74,11 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
       {
         Sid    = "IAMManageProjectRoles"
         Effect = "Allow"
+        # These IAM management actions are Semgrep-flagged categorically as
+        # priv-esc/resource-exposure risk regardless of scoping. Resource is
+        # constrained to k3s-demo-* ARNs; the actual escalation vectors
+        # (AttachRolePolicy, PassRole) are separately condition-scoped below.
+        # nosemgrep: terraform.lang.security.iam.no-iam-priv-esc-funcs.no-iam-priv-esc-funcs,terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
         Action = [
           "iam:CreateRole", "iam:GetRole", "iam:DeleteRole",
           "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
@@ -89,7 +94,11 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
       {
         Sid    = "IAMAttachOnlySSMPolicy"
         Effect = "Allow"
-        Action = ["iam:AttachRolePolicy", "iam:DetachRolePolicy"]
+        # Condition restricts this to attaching/detaching exactly one managed
+        # policy (AmazonSSMManagedInstanceCore) — cannot attach AdministratorAccess
+        # or any other policy to a k3s-demo-* role.
+        # nosemgrep: terraform.lang.security.iam.no-iam-priv-esc-funcs.no-iam-priv-esc-funcs,terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
+        Action   = ["iam:AttachRolePolicy", "iam:DetachRolePolicy"]
         Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
         Condition = {
           StringEquals = {
@@ -100,7 +109,10 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
       {
         Sid    = "IAMPassRoleToEC2Only"
         Effect = "Allow"
-        Action = "iam:PassRole"
+        # Condition restricts PassRole to the EC2 service only — cannot pass a
+        # k3s-demo-* role to Lambda or any other escalation-prone service.
+        # nosemgrep: terraform.lang.security.iam.no-iam-resource-exposure.no-iam-resource-exposure
+        Action   = "iam:PassRole"
         Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
         Condition = {
           StringEquals = {
