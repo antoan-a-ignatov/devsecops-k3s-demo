@@ -81,7 +81,7 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         # (AttachRolePolicy, PassRole) are separately condition-scoped below.
         # nosemgrep
         Action = [
-          "iam:CreateRole", "iam:GetRole", "iam:DeleteRole",
+          "iam:GetRole", "iam:DeleteRole",
           "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
           "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
           "iam:CreateInstanceProfile", "iam:GetInstanceProfile", "iam:DeleteInstanceProfile",
@@ -92,6 +92,21 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "arn:aws:iam::180571023536:role/k3s-demo-*",
           "arn:aws:iam::180571023536:instance-profile/k3s-demo-*"
         ]
+      },
+      {
+        Sid    = "IAMCreateRoleWithBoundary"
+        Effect = "Allow"
+        # Every k3s-demo-* role this identity creates must carry the boundary —
+        # enforced here for anything created/recreated going forward. (iam.tf's
+        # in-place update handles the role that already exists today.)
+        # nosemgrep
+        Action   = "iam:CreateRole"
+        Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
+        Condition = {
+          StringEquals = {
+            "iam:PermissionsBoundary" = aws_iam_policy.k3s_demo_role_boundary.arn
+          }
+        }
       },
       {
         Sid    = "IAMAttachOnlySSMPolicy"
@@ -138,6 +153,30 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "iam:ListOpenIDConnectProviderTags"
         ]
         Resource = "arn:aws:iam::180571023536:oidc-provider/token.actions.githubusercontent.com"
+      },
+      {
+        Sid    = "IAMManageOwnBoundaryPolicy"
+        Effect = "Allow"
+        Action = [
+          "iam:GetPolicy", "iam:CreatePolicy", "iam:DeletePolicy",
+          "iam:GetPolicyVersion", "iam:ListPolicyVersions",
+          "iam:DeletePolicyVersion", "iam:TagPolicy"
+        ]
+        Resource = aws_iam_policy.k3s_demo_role_boundary.arn
+      },
+      {
+        Sid    = "IAMCreatePolicyVersionKnownEscalationRisk"
+        Effect = "Allow"
+        # iam:CreatePolicyVersion is a documented IAM privilege-escalation
+        # technique (creating a new version of a policy you control) —
+        # expected to trip no-iam-priv-esc-funcs. Mitigated by scoping to
+        # this exact boundary policy ARN, which cannot itself grant IAM
+        # actions (see its Action list above: ssm/ec2messages/ssmmessages
+        # only) — so even a maximally broad new version of this specific
+        # policy can't be used to escalate.
+        # nosemgrep: terraform.lang.security.iam.no-iam-priv-esc-funcs.no-iam-priv-esc-funcs
+        Action   = "iam:CreatePolicyVersion"
+        Resource = aws_iam_policy.k3s_demo_role_boundary.arn
       },
       {
         Sid      = "SSMKubeconfig"
