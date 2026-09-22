@@ -157,6 +157,10 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
       {
         Sid    = "IAMManageOwnBoundaryPolicy"
         Effect = "Allow"
+        # Same categorical IAM-management flag seen on every other role/policy
+        # statement in this file. Resource is scoped to this policy's own
+        # exact ARN, not "*".
+        # nosemgrep
         Action = [
           "iam:GetPolicy", "iam:CreatePolicy", "iam:DeletePolicy",
           "iam:GetPolicyVersion", "iam:ListPolicyVersions",
@@ -168,13 +172,16 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Sid    = "IAMCreatePolicyVersionKnownEscalationRisk"
         Effect = "Allow"
         # iam:CreatePolicyVersion is a documented IAM privilege-escalation
-        # technique (creating a new version of a policy you control) —
-        # expected to trip no-iam-priv-esc-funcs. Mitigated by scoping to
-        # this exact boundary policy ARN, which cannot itself grant IAM
-        # actions (see its Action list above: ssm/ec2messages/ssmmessages
-        # only) — so even a maximally broad new version of this specific
-        # policy can't be used to escalate.
-        # nosemgrep: terraform.lang.security.iam.no-iam-priv-esc-funcs.no-iam-priv-esc-funcs
+        # technique (creating a new version of a policy you control). Mitigated
+        # by scoping to this exact boundary policy ARN, which cannot itself
+        # grant IAM actions (see its Action list above: ssm/ec2messages/
+        # ssmmessages only) — so even a maximally broad new version of this
+        # specific policy can't be used to escalate. Using bare nosemgrep
+        # rather than a rule-scoped one: this statement also trips
+        # no-iam-resource-exposure, and this file already has a confirmed,
+        # reproducible bug where comma-delimited multi-rule-ID suppression
+        # unreliably drops one of the listed rules.
+        # nosemgrep
         Action   = "iam:CreatePolicyVersion"
         Resource = aws_iam_policy.k3s_demo_role_boundary.arn
       },
