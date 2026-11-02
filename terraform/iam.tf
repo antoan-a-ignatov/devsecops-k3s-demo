@@ -1,5 +1,5 @@
 resource "aws_iam_role" "k3s_instance_role" {
-  name = "k3s-demo-instance-role"
+  name                 = "k3s-demo-instance-role"
   permissions_boundary = aws_iam_policy.k3s_demo_role_boundary.arn
 
   assume_role_policy = jsonencode({
