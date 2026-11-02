@@ -93,6 +93,7 @@ jobs:
           exit-code: 1
   deploy:
     needs: scan-images
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -151,9 +152,15 @@ jobs:
           KUBECONFIG=/tmp/kubeconfig kubectl apply -f -
 
       - name: Deploy to K3s
+        env:
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           aws ssm get-parameter --name "/k3s-demo/kubeconfig" --region eu-north-1 --with-decryption --query "Parameter.Value" --output text > /tmp/kubeconfig
-          KUBECONFIG=/tmp/kubeconfig kubectl apply --request-timeout=120s -f k8s/
+          rm -rf /tmp/k8s && cp -r k8s /tmp/k8s
+          sed -i "s|/api:latest|/api:${IMAGE_TAG}|; s|/frontend:latest|/frontend:${IMAGE_TAG}|" /tmp/k8s/*.yaml
+          if grep -rn "ghcr.io.*:latest" /tmp/k8s/; then echo "image tag substitution failed"; exit 1; fi
+          KUBECONFIG=/tmp/kubeconfig kubectl apply --request-timeout=120s -f /tmp/k8s/
+          KUBECONFIG=/tmp/kubeconfig kubectl get deploy -o custom-columns=NAME:.metadata.name,IMAGE:.spec.template.spec.containers[*].image
 
       - name: Tighten K3s API access after deploy
         working-directory: ./terraform

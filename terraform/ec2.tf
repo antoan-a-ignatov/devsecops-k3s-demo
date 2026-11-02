@@ -18,6 +18,10 @@ resource "aws_instance" "k3s_demo" {
   instance_type          = "t3.small"
   vpc_security_group_ids = [aws_security_group.k3s_demo.id]
   iam_instance_profile   = aws_iam_instance_profile.k3s_instance_profile.name
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
 
   user_data = <<-EOF2
     #!/bin/bash
@@ -39,12 +43,6 @@ resource "aws_instance" "k3s_demo" {
     curl -sfL https://get.k3s.io | sh -s - --tls-san "$PUBLIC_IP" --disable metrics-server --kube-apiserver-arg=max-requests-inflight=50 --kube-controller-manager-arg=node-monitor-period=60s --kube-controller-manager-arg=node-monitor-grace-period=180s
 
     sleep 30
-
-    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-    helm repo add sealed-secrets https://bitnami.github.io/sealed-secrets
-    helm repo update
-    helm install sealed-secrets -n kube-system --set-string fullnameOverride=sealed-secrets-controller sealed-secrets/sealed-secrets --kubeconfig /etc/rancher/k3s/k3s.yaml
 
     KUBECONFIG_CONTENT=$(cat /etc/rancher/k3s/k3s.yaml)
     KUBECONFIG_CONTENT=$(echo "$KUBECONFIG_CONTENT" | sed "s/127.0.0.1/$PUBLIC_IP/")
