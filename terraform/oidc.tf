@@ -73,12 +73,11 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Resource = "*"
       },
       {
-        Sid    = "IAMManageProjectRoles"
+        Sid    = "IAMManageInstanceRole"
         Effect = "Allow"
-        # These IAM management actions are Semgrep-flagged categorically as
-        # priv-esc/resource-exposure risk regardless of scoping. Resource is
-        # constrained to k3s-demo-* ARNs; the actual escalation vectors
-        # (AttachRolePolicy, PassRole) are separately condition-scoped below.
+        # Write access is limited to the one instance role and instance profile this
+        # project creates, by exact name. The CI role's own name no longer matches,
+        # so it cannot edit its own permissions.
         # nosemgrep
         Action = [
           "iam:GetRole", "iam:DeleteRole",
@@ -89,19 +88,17 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "iam:ListInstanceProfilesForRole", "iam:TagRole"
         ]
         Resource = [
-          "arn:aws:iam::180571023536:role/k3s-demo-*",
-          "arn:aws:iam::180571023536:instance-profile/k3s-demo-*"
+          "arn:aws:iam::180571023536:role/k3s-demo-instance-role",
+          "arn:aws:iam::180571023536:instance-profile/k3s-demo-instance-profile"
         ]
       },
       {
-        Sid    = "IAMCreateRoleWithBoundary"
+        Sid    = "IAMCreateInstanceRoleWithBoundary"
         Effect = "Allow"
-        # Every k3s-demo-* role this identity creates must carry the boundary —
-        # enforced here for anything created/recreated going forward. (iam.tf's
-        # in-place update handles the role that already exists today.)
+        # The instance role can only be created with the permissions boundary attached.
         # nosemgrep
         Action   = "iam:CreateRole"
-        Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
+        Resource = "arn:aws:iam::180571023536:role/k3s-demo-instance-role"
         Condition = {
           StringEquals = {
             "iam:PermissionsBoundary" = aws_iam_policy.k3s_demo_role_boundary.arn
@@ -112,11 +109,10 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         Sid    = "IAMAttachOnlySSMPolicy"
         Effect = "Allow"
         # Condition restricts this to attaching/detaching exactly one managed
-        # policy (AmazonSSMManagedInstanceCore) — cannot attach AdministratorAccess
-        # or any other policy to a k3s-demo-* role.
+        # policy (AmazonSSMManagedInstanceCore) to the instance role.
         # nosemgrep
         Action   = ["iam:AttachRolePolicy", "iam:DetachRolePolicy"]
-        Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
+        Resource = "arn:aws:iam::180571023536:role/k3s-demo-instance-role"
         Condition = {
           StringEquals = {
             "iam:PolicyARN" = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
@@ -124,13 +120,12 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         }
       },
       {
-        Sid    = "IAMPassRoleToEC2Only"
+        Sid    = "IAMPassInstanceRoleToEC2Only"
         Effect = "Allow"
-        # Condition restricts PassRole to the EC2 service only — cannot pass a
-        # k3s-demo-* role to Lambda or any other escalation-prone service.
+        # Condition restricts PassRole to the EC2 service only.
         # nosemgrep
         Action   = "iam:PassRole"
-        Resource = "arn:aws:iam::180571023536:role/k3s-demo-*"
+        Resource = "arn:aws:iam::180571023536:role/k3s-demo-instance-role"
         Condition = {
           StringEquals = {
             "iam:PassedToService" = "ec2.amazonaws.com"
@@ -138,51 +133,29 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         }
       },
       {
-        Sid    = "IAMManageOwnOIDCProvider"
+        Sid    = "IAMReadOwnRole"
         Effect = "Allow"
-        # Resource is scoped to the exact OIDC provider ARN this role lives under —
-        # cannot manage any other provider.
-        # nosemgrep
+        Action = [
+          "iam:GetRole", "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies", "iam:GetRolePolicy"
+        ]
+        Resource = "arn:aws:iam::180571023536:role/k3s-demo-github-actions-deploy"
+      },
+      {
+        Sid    = "IAMReadOIDCProvider"
+        Effect = "Allow"
         Action = [
           "iam:GetOpenIDConnectProvider",
-          "iam:CreateOpenIDConnectProvider",
-          "iam:DeleteOpenIDConnectProvider",
-          "iam:UpdateOpenIDConnectProviderThumbprint",
-          "iam:TagOpenIDConnectProvider",
-          "iam:UntagOpenIDConnectProvider",
           "iam:ListOpenIDConnectProviderTags"
         ]
         Resource = "arn:aws:iam::180571023536:oidc-provider/token.actions.githubusercontent.com"
       },
       {
-        Sid    = "IAMManageOwnBoundaryPolicy"
+        Sid    = "IAMReadBoundaryPolicy"
         Effect = "Allow"
-        # Same categorical IAM-management flag seen on every other role/policy
-        # statement in this file. Resource is scoped to this policy's own
-        # exact ARN, not "*".
-        # nosemgrep
         Action = [
-          "iam:GetPolicy", "iam:CreatePolicy", "iam:DeletePolicy",
-          "iam:GetPolicyVersion", "iam:ListPolicyVersions",
-          "iam:DeletePolicyVersion", "iam:TagPolicy"
+          "iam:GetPolicy", "iam:GetPolicyVersion", "iam:ListPolicyVersions"
         ]
-        Resource = aws_iam_policy.k3s_demo_role_boundary.arn
-      },
-      {
-        Sid    = "IAMCreatePolicyVersionKnownEscalationRisk"
-        Effect = "Allow"
-        # iam:CreatePolicyVersion is a documented IAM privilege-escalation
-        # technique (creating a new version of a policy you control). Mitigated
-        # by scoping to this exact boundary policy ARN, which cannot itself
-        # grant IAM actions (see its Action list above: ssm/ec2messages/
-        # ssmmessages only) — so even a maximally broad new version of this
-        # specific policy can't be used to escalate. Using bare nosemgrep
-        # rather than a rule-scoped one: this statement also trips
-        # no-iam-resource-exposure, and this file already has a confirmed,
-        # reproducible bug where comma-delimited multi-rule-ID suppression
-        # unreliably drops one of the listed rules.
-        # nosemgrep
-        Action   = "iam:CreatePolicyVersion"
         Resource = aws_iam_policy.k3s_demo_role_boundary.arn
       },
       {
